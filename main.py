@@ -1,16 +1,28 @@
+#==========================================================================#
+# Required libraries                                                       #
+# To install run:                                                          #
+# ~$ pip install face_recognition opencv-python numpy playsound            #
+#==========================================================================#
+
 import face_recognition
 import cv2
 import numpy as np
+import time
+import playsound
+
 import config as cfg
 
 #Webcam
 video_capture = cv2.VideoCapture(0)
 
 
+
 # Create arrays from config of known face encodings and their names
 known_face_names = cfg.known_face_names
 known_face_music = cfg.known_face_music
 known_face_encodings = []
+
+timeout = 0
 
 # Images
 for imagestr in cfg.known_face_images:
@@ -27,7 +39,14 @@ face_encodings = []
 face_names = []
 process_this_frame = True
 
+# run logic here
+
+deltatime = 0
+
 while True:
+    start = time.time()
+
+
     # Grab a single frame of video
     ret, frame = video_capture.read()
 
@@ -44,6 +63,7 @@ while True:
         face_encodings = face_recognition.face_encodings(rgb_small_frame, face_locations)
 
         face_names = []
+        face_index = -1
         for face_encoding in face_encodings:
             # See if the face is a match for the known face(s)
             matches = face_recognition.compare_faces(known_face_encodings, face_encoding)
@@ -59,6 +79,7 @@ while True:
             best_match_index = np.argmin(face_distances)
             if matches[best_match_index]:
                 name = known_face_names[best_match_index]
+                face_index = best_match_index
 
             face_names.append(name)
 
@@ -84,9 +105,19 @@ while True:
     # Display the resulting image
     cv2.imshow('Video', frame)
 
+    #if face is detected
+    if face_index > -1 and timeout < 0:
+        timeout = cfg.timeout_time
+        playsound.playsound(known_face_music[face_index])
+
+    timeout -= deltatime
+
     # Hit 'q' on the keyboard to quit!
     if cv2.waitKey(1) & 0xFF == ord('q'):
         break
+
+    deltatime = time.time() - start
+
 
 # Release handle to the webcam
 video_capture.release()
