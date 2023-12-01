@@ -23,6 +23,8 @@ known_face_music = cfg.known_face_music
 known_face_encodings = []
 
 timeout = 0
+# /8 because deltatime is prolly incorect
+hold_time = cfg.hold_duration/8
 
 # Images
 for imagestr in cfg.known_face_images:
@@ -39,7 +41,7 @@ face_encodings = []
 face_names = []
 process_this_frame = True
 
-# run logic here
+confidence = 1
 
 deltatime = 0
 
@@ -52,6 +54,8 @@ while True:
 
     # Only process every other frame of video to save time
     if process_this_frame:
+        confidence = 1
+
         # Resize frame of video to 1/4 size for faster face recognition processing
         small_frame = cv2.resize(frame, (0, 0), fx=0.25, fy=0.25)
 
@@ -64,6 +68,9 @@ while True:
 
         face_names = []
         face_index = -1
+
+        hold_time += deltatime
+
         for face_encoding in face_encodings:
             # See if the face is a match for the known face(s)
             matches = face_recognition.compare_faces(known_face_encodings, face_encoding)
@@ -79,12 +86,20 @@ while True:
             best_match_index = np.argmin(face_distances)
             if matches[best_match_index]:
                 name = known_face_names[best_match_index]
-                face_index = best_match_index
+                confidence = face_distances[best_match_index]
+                if confidence < cfg.face_treshold:
+                    #2 deltatime times because it is always being removed 
+                    hold_time -= 2*deltatime
+
+                    if hold_time < 0:
+                        # Set the face index for the audio player to see
+                        face_index = best_match_index
 
             face_names.append(name)
 
     process_this_frame = not process_this_frame
 
+    font = cv2.FONT_HERSHEY_DUPLEX
 
     # Display the results
     for (top, right, bottom, left), name in zip(face_locations, face_names):
@@ -99,18 +114,32 @@ while True:
 
         # Draw a label with a name below the face
         cv2.rectangle(frame, (left, bottom - 35), (right, bottom), (0, 0, 255), cv2.FILLED)
-        font = cv2.FONT_HERSHEY_DUPLEX
         cv2.putText(frame, name, (left + 6, bottom - 6), font, 1.0, (255, 255, 255), 1)
+
+    #Draw debug variables
+    color = (0,0,255)
+    if (confidence < cfg.face_treshold):
+        color = (0,255,0)
+    cv2.putText(frame,"Confidence: " + str(round((1-confidence)*100))+"% / "+str((1-cfg.face_treshold)*100)+"%",(0,25),font,1.0,color,1)
+    cv2.putText(frame,"hold: " + str(round(hold_time*4,2)),(0,50),font,1.0,(255,255,255),1)
+    cv2.putText(frame,"cooldown: " + str(round(timeout,2)),(0,75),font,1.0,(255,255,255),1)
+
 
     # Display the resulting image
     cv2.imshow('Video', frame)
 
     #if face is detected
-    if face_index > -1 and timeout < 0:
+    if face_index > -1 and timeout <= 0:
         timeout = cfg.timeout_time
+        # /8 because deltatime is prolly incorect
+        hold_time = cfg.hold_duration/8
         playsound.playsound(known_face_music[face_index])
 
     timeout -= deltatime
+    if timeout <= 0:
+        timeout = 0
+    if hold_time > cfg.hold_duration/8:
+        hold_time = cfg.hold_duration/8
 
     # Hit 'q' on the keyboard to quit!
     if cv2.waitKey(1) & 0xFF == ord('q'):
