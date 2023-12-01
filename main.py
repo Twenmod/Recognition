@@ -1,22 +1,25 @@
 import face_recognition
 import cv2
 import numpy as np
+import config as cfg
 
 #Webcam
 video_capture = cv2.VideoCapture(0)
 
+
+# Create arrays from config of known face encodings and their names
+known_face_names = cfg.known_face_names
+known_face_music = cfg.known_face_music
+known_face_encodings = []
+
 # Images
-jack_image = face_recognition.load_image_file("./images/img.jpg")
-jack_encoding = face_recognition.face_encodings(jack_image)[0]
+for imagestr in cfg.known_face_images:
+    image = face_recognition.load_image_file(imagestr)
+    encoding = face_recognition.face_encodings(image)[0]
+    known_face_encodings.append(encoding)
 
 
-# Create arrays of known face encodings and their names
-known_face_encodings = [
-    jack_encoding
-]
-known_face_names = [
-    "Barack Obama"
-]
+
 
 # Initialize some variables
 face_locations = []
@@ -34,7 +37,7 @@ while True:
         small_frame = cv2.resize(frame, (0, 0), fx=0.25, fy=0.25)
 
         # Convert the image from BGR color (which OpenCV uses) to RGB color (which face_recognition uses)
-        rgb_small_frame = small_frame[:, :, ::-1]
+        rgb_small_frame = np.ascontiguousarray(small_frame[:, :, ::-1])
         
         # Find all the faces and face encodings in the current frame of video
         face_locations = face_recognition.face_locations(rgb_small_frame)
